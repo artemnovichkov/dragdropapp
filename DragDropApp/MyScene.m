@@ -19,6 +19,41 @@ static NSString * const kAnimalNodeName = @"movable";
 
 @implementation MyScene
 
+
+
+- (CGPoint)boundLayerPos:(CGPoint)newPos {
+    CGSize winSize = self.size;
+    CGPoint retval = newPos;
+    retval.x = MIN(retval.x, 0);
+    retval.x = MAX(retval.x, -[_background size].width+ winSize.width);
+    retval.y = [self position].y;
+    return retval;
+}
+
+- (void)panForTranslation:(CGPoint)translation {
+    CGPoint position = [_selectedNode position];
+    if([[_selectedNode name] isEqualToString:kAnimalNodeName]) {
+        [_selectedNode setPosition:CGPointMake(position.x + translation.x, position.y + translation.y)];
+    } else {
+        CGPoint newPos = CGPointMake(position.x + translation.x, position.y + translation.y);
+        [_background setPosition:[self boundLayerPos:newPos]];
+    }
+}
+
+- (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+	UITouch *touch = [touches anyObject];
+	CGPoint positionInScene = [touch locationInNode:self];
+	CGPoint previousPosition = [touch previousLocationInNode:self];
+    
+	CGPoint translation = CGPointMake(positionInScene.x - previousPosition.x, positionInScene.y - previousPosition.y);
+    
+	[self panForTranslation:translation];
+}
+
+float degToRad(float degree) {
+	return degree / 180.0f * M_PI;
+}
+
 -(id)initWithSize:(CGSize)size {    
     if (self = [super initWithSize:size]) {
         /* Setup your scene here */
@@ -44,20 +79,28 @@ static NSString * const kAnimalNodeName = @"movable";
 
 -(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
     /* Called when a touch begins */
+    UITouch * touch = [touches anyObject];
+    CGPoint positionInScene = [touch locationInNode:self];
+    [self selectNodeForTouch:positionInScene];
+}
+
+-(void) selectNodeForTouch:(CGPoint)touchLocation
+{
+    SKSpriteNode *touchedNode = (SKSpriteNode *)[self nodeAtPoint:touchLocation];
     
-    for (UITouch *touch in touches) {
-        CGPoint location = [touch locationInNode:self];
+    if(![_selectedNode isEqual:touchedNode]) {
+		[_selectedNode removeAllActions];
+		[_selectedNode runAction:[SKAction rotateToAngle:0.0f duration:0.1]];
         
-        SKSpriteNode *sprite = [SKSpriteNode spriteNodeWithImageNamed:@"Spaceship"];
+		_selectedNode = touchedNode;
         
-        sprite.position = location;
-        
-        SKAction *action = [SKAction rotateByAngle:M_PI duration:1];
-        
-        [sprite runAction:[SKAction repeatActionForever:action]];
-        
-        [self addChild:sprite];
-    }
+		if([[touchedNode name] isEqualToString:kAnimalNodeName]) {
+			SKAction *sequence = [SKAction sequence:@[[SKAction rotateByAngle:degToRad(-4.0f) duration:0.1],
+													  [SKAction rotateByAngle:0.0 duration:0.1],
+													  [SKAction rotateByAngle:degToRad(4.0f) duration:0.1]]];
+			[_selectedNode runAction:[SKAction repeatActionForever:sequence]];
+		}
+	}
 }
 
 -(void)update:(CFTimeInterval)currentTime {
